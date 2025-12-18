@@ -15,16 +15,16 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# CUSTOM GRADIENT BACKGROUND
+# LIGHT THEME BACKGROUND
 # --------------------------------------------------
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg, #0F2027, #203A43, #2C5364);
-    color: #F5F7FA;
+    background: linear-gradient(to bottom right, #F8FAFC, #EAF2FF);
+    color: #1F2933;
 }
 h1, h2, h3 {
-    color: #F5F7FA;
+    color: #1F2933;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -37,7 +37,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 st.markdown(
-    "<p style='text-align:center;'>Advanced NLP-driven insights for student satisfaction & improvement</p>",
+    "<p style='text-align:center;color:#4B5563;'>Advanced NLP-based analysis to uncover satisfaction trends and improvement areas</p>",
     unsafe_allow_html=True
 )
 
@@ -53,7 +53,7 @@ df = load_data()
 # --------------------------------------------------
 # SIDEBAR
 # --------------------------------------------------
-st.sidebar.header("🔍 Analysis Controls")
+st.sidebar.header("🔍 Select Feedback Category")
 
 category_map = {
     "Teaching": "teaching.1",
@@ -65,7 +65,7 @@ category_map = {
 }
 
 selected_category = st.sidebar.selectbox(
-    "Select Feedback Category",
+    "Category",
     list(category_map.keys())
 )
 
@@ -92,15 +92,15 @@ df["Sentiment"] = df[text_column].apply(get_sentiment)
 # --------------------------------------------------
 sentiment_counts = df["Sentiment"].value_counts()
 
-c1, c2, c3 = st.columns(3)
-c1.metric("😊 Positive", sentiment_counts.get("Positive", 0))
-c2.metric("😐 Neutral", sentiment_counts.get("Neutral", 0))
-c3.metric("😞 Negative", sentiment_counts.get("Negative", 0))
+k1, k2, k3 = st.columns(3)
+k1.metric("😊 Positive", sentiment_counts.get("Positive", 0))
+k2.metric("😐 Neutral", sentiment_counts.get("Neutral", 0))
+k3.metric("😞 Negative", sentiment_counts.get("Negative", 0))
 
 st.markdown("---")
 
 # --------------------------------------------------
-# 3D-STYLE PIE CHART (SIMULATED DEPTH)
+# 3D-STYLE PIE CHART (SIMULATED)
 # --------------------------------------------------
 st.subheader(f"📊 Sentiment Distribution — {selected_category}")
 
@@ -114,15 +114,18 @@ pie_fig = px.pie(
 )
 
 pie_fig.update_traces(
-    pull=[0.05, 0.02, 0.08],  # depth illusion
-    textinfo="percent+label",
-    marker=dict(line=dict(color="#0B1C2D", width=2))
+    pull=[0.06, 0.02, 0.08],  # depth illusion
+    rotation=45,
+    marker=dict(
+        line=dict(color="#FFFFFF", width=3)
+    ),
+    textinfo="percent+label"
 )
 
 pie_fig.update_layout(
-    showlegend=True,
     paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)"
+    plot_bgcolor="rgba(0,0,0,0)",
+    showlegend=True
 )
 
 st.plotly_chart(pie_fig, use_container_width=True)
@@ -130,10 +133,10 @@ st.plotly_chart(pie_fig, use_container_width=True)
 # --------------------------------------------------
 # SENTIMENT TREND ANALYSIS
 # --------------------------------------------------
-st.subheader("📈 Sentiment Trend Across Responses")
+st.subheader("📈 Sentiment Trend")
 
-sentiment_score_map = {"Positive": 1, "Neutral": 0, "Negative": -1}
-df["Sentiment_Score"] = df["Sentiment"].map(sentiment_score_map)
+sentiment_map = {"Positive": 1, "Neutral": 0, "Negative": -1}
+df["Sentiment_Score"] = df["Sentiment"].map(sentiment_map)
 df["Index"] = np.arange(len(df))
 
 trend_fig = px.line(
@@ -141,44 +144,45 @@ trend_fig = px.line(
     x="Index",
     y="Sentiment_Score",
     markers=True,
-    color_discrete_sequence=["#4CC9F0"]
+    color_discrete_sequence=["#4361EE"]
 )
 
 trend_fig.update_layout(
+    yaxis=dict(
+        tickvals=[-1, 0, 1],
+        ticktext=["Negative", "Neutral", "Positive"]
+    ),
     paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    yaxis=dict(tickvals=[-1, 0, 1], ticktext=["Negative", "Neutral", "Positive"])
+    plot_bgcolor="rgba(0,0,0,0)"
 )
 
 st.plotly_chart(trend_fig, use_container_width=True)
 
 # --------------------------------------------------
-# WORD CLOUD (UNIQUE BACKGROUND)
+# WORD CLOUD (LIGHT THEME)
 # --------------------------------------------------
-st.subheader("☁️ Dominant Feedback Themes")
+st.subheader("☁️ Key Feedback Themes")
 
 combined_text = " ".join(df[text_column].dropna().astype(str))
 
 wordcloud = WordCloud(
     width=900,
     height=400,
-    background_color=None,
-    mode="RGBA",
-    colormap="winter",
+    background_color="white",
+    colormap="cool",
     max_words=120
 ).generate(combined_text)
 
 fig, ax = plt.subplots(figsize=(10, 4))
 ax.imshow(wordcloud)
 ax.axis("off")
-fig.patch.set_alpha(0)
 
 st.pyplot(fig)
 
 # --------------------------------------------------
 # SAMPLE DATA
 # --------------------------------------------------
-with st.expander("📂 View Sample Feedback"):
+with st.expander("📂 Sample Feedback"):
     st.dataframe(df[[text_column, "Sentiment"]].head(10))
 
 # --------------------------------------------------
@@ -186,9 +190,9 @@ with st.expander("📂 View Sample Feedback"):
 # --------------------------------------------------
 st.subheader("📌 Key Insights")
 st.markdown(f"""
-- **{selected_category}** feedback is predominantly **{sentiment_counts.idxmax()}**
-- Negative sentiment highlights targeted improvement areas
-- Trend analysis shows overall sentiment stability
+- **{selected_category}** feedback is largely **{sentiment_counts.idxmax()}**
+- Negative responses indicate actionable improvement areas
+- Sentiment trend shows overall consistency
 """)
 
 # --------------------------------------------------
@@ -196,9 +200,9 @@ st.markdown(f"""
 # --------------------------------------------------
 st.subheader("⚠️ Limitations")
 st.markdown("""
-- TextBlob may miss sarcasm or contextual nuances  
-- Dataset is limited to a single institution  
-- Lack of time-based feedback restricts temporal analysis  
+- Lexicon-based sentiment may miss sarcasm  
+- Dataset limited to a single institution  
+- Temporal patterns are not available  
 """)
 
 # --------------------------------------------------
@@ -206,13 +210,13 @@ st.markdown("""
 # --------------------------------------------------
 st.subheader("🚀 Future Enhancements")
 st.markdown("""
-- Integrate **BERT-based sentiment models**  
-- Apply **topic modeling (LDA)** for complaint clustering  
-- Enable real-time feedback ingestion  
-- Add admin-level filters and dashboards  
+- BERT-based sentiment classification  
+- Topic modeling (LDA) for complaint discovery  
+- Real-time feedback dashboard  
+- Admin filters & role-based views  
 """)
 
 st.markdown(
-    "<p style='text-align:center;font-size:12px;'>Built with ❤️ using Streamlit & NLP</p>",
+    "<p style='text-align:center;font-size:12px;color:#6B7280;'>Built with Streamlit & NLP</p>",
     unsafe_allow_html=True
 )
