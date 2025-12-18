@@ -17,16 +17,19 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# LIGHT THEME BACKGROUND
+# SEA BLUE + GREEN BACKGROUND THEME
 # --------------------------------------------------
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(to bottom right, #F8FAFC, #EAF2FF);
+    background: linear-gradient(135deg, #E0F7FA, #E8F5E9);
     color: #1F2933;
 }
 h1, h2, h3 {
     color: #1F2933;
+}
+.sidebar .sidebar-content {
+    background-color: #E0F2F1;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -35,11 +38,11 @@ h1, h2, h3 {
 # TITLE
 # --------------------------------------------------
 st.markdown(
-    "<h1 style='text-align:center;'>🎓 Student Event Feedback Sentiment Analysis</h1>",
+    "<h1 style='text-align:center;'>🎓 Student Feedback Sentiment Analysis</h1>",
     unsafe_allow_html=True
 )
 st.markdown(
-    "<p style='text-align:center;color:#4B5563;'>Advanced NLP dashboard with sentiment analysis & topic modeling</p>",
+    "<p style='text-align:center;color:#374151;'>Advanced NLP dashboard to uncover satisfaction trends & improvement areas</p>",
     unsafe_allow_html=True
 )
 
@@ -55,7 +58,7 @@ df = load_data()
 # --------------------------------------------------
 # SIDEBAR CONTROLS
 # --------------------------------------------------
-st.sidebar.header("🔍 Controls")
+st.sidebar.header("🔍 Analysis Controls")
 
 category_map = {
     "Teaching": "teaching.1",
@@ -66,8 +69,12 @@ category_map = {
     "Extracurricular": "extracurricular.1"
 }
 
-category = st.sidebar.selectbox("Select Feedback Category", list(category_map.keys()))
-text_column = category_map[category]
+selected_category = st.sidebar.selectbox(
+    "Select Feedback Category",
+    list(category_map.keys())
+)
+
+text_column = category_map[selected_category]
 
 # --------------------------------------------------
 # SENTIMENT FUNCTION
@@ -90,10 +97,10 @@ df["Sentiment"] = df[text_column].apply(get_sentiment)
 # --------------------------------------------------
 sentiment_counts = df["Sentiment"].value_counts()
 
-k1, k2, k3 = st.columns(3)
-k1.metric("😊 Positive", sentiment_counts.get("Positive", 0))
-k2.metric("😐 Neutral", sentiment_counts.get("Neutral", 0))
-k3.metric("😞 Negative", sentiment_counts.get("Negative", 0))
+c1, c2, c3 = st.columns(3)
+c1.metric("😊 Positive", sentiment_counts.get("Positive", 0))
+c2.metric("😐 Neutral", sentiment_counts.get("Neutral", 0))
+c3.metric("😞 Negative", sentiment_counts.get("Negative", 0))
 
 st.markdown("---")
 
@@ -106,23 +113,22 @@ tab1, tab2, tab3 = st.tabs([
     "🧑‍🎓 Student View"
 ])
 
-# ==================================================
-# 🎓 ADMIN VIEW
-# ==================================================
+# ================= ADMIN VIEW =================
 with tab1:
-    st.subheader("📊 Overall Sentiment Distribution")
+    st.subheader(f"📊 Sentiment Distribution — {selected_category}")
 
     pie_fig = px.pie(
         values=sentiment_counts.values,
         names=sentiment_counts.index,
-        hole=0.35,
-        color_discrete_sequence=["#4CC9F0", "#FFD166", "#EF476F"]
+        color_discrete_sequence=["#2EC4B6", "#90DBF4", "#EF476F"],
+        hole=0.35
     )
 
     pie_fig.update_traces(
-        pull=[0.06, 0.02, 0.08],
+        pull=[0.06, 0.03, 0.08],   # 3D-style depth illusion
         rotation=40,
-        textinfo="percent+label"
+        textinfo="percent+label",
+        marker=dict(line=dict(color="white", width=3))
     )
 
     pie_fig.update_layout(
@@ -134,12 +140,10 @@ with tab1:
 
     st.markdown("""
     **Admin Insight:**  
-    This view highlights high-level satisfaction trends to support strategic decision-making.
+    This overview helps management identify satisfaction levels and risk areas quickly.
     """)
 
-# ==================================================
-# 👨‍🏫 FACULTY VIEW
-# ==================================================
+# ================= FACULTY VIEW =================
 with tab2:
     st.subheader("📈 Sentiment Trend Across Responses")
 
@@ -152,7 +156,7 @@ with tab2:
         x="Index",
         y="Sentiment_Score",
         markers=True,
-        color_discrete_sequence=["#4361EE"]
+        color_discrete_sequence=["#2EC4B6"]
     )
 
     trend_fig.update_layout(
@@ -168,14 +172,12 @@ with tab2:
 
     st.markdown("""
     **Faculty Insight:**  
-    Trends help educators understand consistency and emotional response patterns.
+    Trend patterns help instructors understand consistency and emotional response.
     """)
 
-# ==================================================
-# 🧑‍🎓 STUDENT VIEW
-# ==================================================
+# ================= STUDENT VIEW =================
 with tab3:
-    st.subheader("☁️ Key Feedback Themes (Word Cloud)")
+    st.subheader("☁️ Key Feedback Themes")
 
     combined_text = " ".join(df[text_column].dropna().astype(str))
 
@@ -183,7 +185,7 @@ with tab3:
         width=900,
         height=400,
         background_color="white",
-        colormap="cool",
+        colormap="summer",
         max_words=120
     ).generate(combined_text)
 
@@ -194,7 +196,7 @@ with tab3:
 
     st.markdown("""
     **Student Insight:**  
-    Frequently mentioned terms highlight what students care about most.
+    Frequently mentioned terms highlight common experiences and expectations.
     """)
 
 # --------------------------------------------------
@@ -205,54 +207,43 @@ st.subheader("🧠 Topic Modeling (LDA) — Hidden Themes")
 
 text_data = df[text_column].dropna().astype(str)
 
-vectorizer = CountVectorizer(
-    stop_words="english",
-    max_df=0.9,
-    min_df=5
-)
+try:
+    vectorizer = CountVectorizer(stop_words="english", max_df=0.9, min_df=5)
+    dtm = vectorizer.fit_transform(text_data)
 
-dtm = vectorizer.fit_transform(text_data)
+    lda_model = LatentDirichletAllocation(n_components=3, random_state=42)
+    lda_model.fit(dtm)
 
-lda_model = LatentDirichletAllocation(
-    n_components=3,
-    random_state=42
-)
+    feature_names = vectorizer.get_feature_names_out()
 
-lda_model.fit(dtm)
+    for i, topic in enumerate(lda_model.components_):
+        top_words = [feature_names[j] for j in topic.argsort()[:-7:-1]]
+        st.markdown(f"**Topic {i+1}:** {', '.join(top_words)}")
 
-feature_names = vectorizer.get_feature_names_out()
-
-def display_topics(model, feature_names, num_words=6):
-    topics = []
-    for topic_idx, topic in enumerate(model.components_):
-        top_words = [feature_names[i] for i in topic.argsort()[:-num_words - 1:-1]]
-        topics.append(", ".join(top_words))
-    return topics
-
-topics = display_topics(lda_model, feature_names)
-
-for i, topic in enumerate(topics, start=1):
-    st.markdown(f"**Topic {i}:** {topic}")
+except:
+    st.warning("Topic modeling could not be generated due to limited data.")
 
 # --------------------------------------------------
-# LIMITATIONS & FUTURE
+# LIMITATIONS & FUTURE SCOPE
 # --------------------------------------------------
 st.subheader("⚠️ Limitations")
 st.markdown("""
-- Topic modeling depends on dataset size and text quality  
-- Lexicon-based sentiment may miss sarcasm  
-- Feedback lacks time-based tracking  
+- Lexicon-based sentiment analysis may miss sarcasm  
+- Dataset limited to one institution  
+- Topic modeling depends on text volume  
 """)
 
-st.subheader("🚀 Future Scope")
+st.subheader("🚀 Future Enhancements")
 st.markdown("""
-- Transformer-based sentiment models (BERT)  
-- Topic trend evolution over time  
-- Real-time feedback ingestion  
-- Department-level dashboards  
+- Transformer-based models (BERT)  
+- Time-based sentiment trends  
+- Real-time feedback dashboards  
+- Role-based analytics views  
 """)
 
 st.markdown(
-    "<p style='text-align:center;font-size:12px;color:#6B7280;'>Advanced NLP Dashboard | Streamlit</p>",
+    "<p style='text-align:center;font-size:12px;color:#374151;'>Built with Streamlit & NLP</p>",
     unsafe_allow_html=True
 )
+
+
