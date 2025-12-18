@@ -53,17 +53,28 @@ ax.set_xlabel("Sentiment")
 ax.set_ylabel("Number of Responses")
 
 st.pyplot(fig)
-st.subheader("🧠 Key Insights")
+st.markdown("---")
+st.subheader("📌 Key Insights")
 
 st.markdown("""
-- 📌 Teaching feedback is **mostly positive**, indicating effective instruction.
-- 📌 Some neutral and negative responses suggest **scope for improvement**.
-- 📌 Library and infrastructure-related feedback needs attention.
+- Teaching feedback is **mostly positive**, indicating effective instruction.
+- Library facilities show **mixed to negative sentiment**, suggesting scope for improvement.
+- Examination-related feedback is **neutral**, indicating consistency but limited engagement.
 """)
-st.subheader("🧠 Key Insights")
+
+st.subheader("⚠️ Limitations")
 
 st.markdown("""
-- 📌 Teaching feedback is **mostly positive**, indicating effective instruction.
-- 📌 Some neutral and negative responses suggest **scope for improvement**.
-- 📌 Library and infrastructure-related feedback needs attention.
+- Sentiment analysis relies on **lexicon-based models** (TextBlob), which may miss context.
+- Dataset size is relatively small and limited to one institution.
+- Neutral labels may include slightly positive or negative opinions.
 """)
+
+st.subheader("🚀 Future Scope")
+
+st.markdown("""
+- Apply **VADER or transformer-based models (BERT)** for deeper sentiment analysis.
+- Perform **topic modeling (LDA)** to extract key complaint themes.
+- Deploy a **fully interactive dashboard** with filters for categories and sentiment.
+""")
+
