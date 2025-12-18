@@ -138,5 +138,3 @@ st.markdown(
     "<p style='text-align:center; font-size:12px;'>Built with ❤️ using Streamlit & NLP</p>",
     unsafe_allow_html=True
 )
-
-
