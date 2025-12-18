@@ -7,20 +7,19 @@ from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
-from collections import Counter
-import re
+import seaborn as sns
 
-# --------------------------------------------------
+# ==================================================
 # PAGE CONFIG
-# --------------------------------------------------
+# ==================================================
 st.set_page_config(
     page_title="Student Feedback Sentiment Analysis",
     layout="wide"
 )
 
-# --------------------------------------------------
-# SEA BLUE + GREEN THEME
-# --------------------------------------------------
+# ==================================================
+# THEME (Sea Blue + Green)
+# ==================================================
 st.markdown("""
 <style>
 .stApp {
@@ -30,27 +29,35 @@ st.markdown("""
 h1, h2, h3 {
     color: #1F2933;
 }
+.insight-box {
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+.good { background-color: #D1FAE5; }
+.warn { background-color: #FEF3C7; }
+.bad { background-color: #FEE2E2; }
 </style>
 """, unsafe_allow_html=True)
 
-# --------------------------------------------------
+# ==================================================
 # TITLE
-# --------------------------------------------------
+# ==================================================
 st.markdown("<h1 style='text-align:center;'>🎓 Student Feedback Sentiment Analysis</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;color:#374151;'>Advanced NLP dashboard with sentiment, keywords & topic modeling</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;'>Advanced NLP Dashboard with Insights & Recommendations</p>", unsafe_allow_html=True)
 
-# --------------------------------------------------
+# ==================================================
 # LOAD DATA
-# --------------------------------------------------
+# ==================================================
 @st.cache_data
 def load_data():
     return pd.read_excel("dataset/finalDataset0.2.xlsx")
 
 df = load_data()
 
-# --------------------------------------------------
-# SIDEBAR
-# --------------------------------------------------
+# ==================================================
+# SIDEBAR CONTROLS
+# ==================================================
 st.sidebar.header("🔍 Controls")
 
 category_map = {
@@ -62,152 +69,132 @@ category_map = {
     "Extracurricular": "extracurricular.1"
 }
 
-category = st.sidebar.selectbox("Select Feedback Category", list(category_map.keys()))
-text_column = category_map[category]
+selected_category = st.sidebar.selectbox(
+    "Select Feedback Category",
+    list(category_map.keys()),
+    help="Choose which feedback area to analyze"
+)
 
-# --------------------------------------------------
+text_column = category_map[selected_category]
+
+# ==================================================
 # SENTIMENT FUNCTIONS
-# --------------------------------------------------
-def get_sentiment(text):
-    if pd.isna(text):
-        return "Neutral"
-    polarity = TextBlob(str(text)).sentiment.polarity
-    if polarity > 0:
-        return "Positive"
-    elif polarity < 0:
-        return "Negative"
-    else:
-        return "Neutral"
-
+# ==================================================
 def get_polarity(text):
     if pd.isna(text):
         return 0
     return TextBlob(str(text)).sentiment.polarity
 
-df["Sentiment"] = df[text_column].apply(get_sentiment)
+def get_sentiment_label(score):
+    if score > 0.5:
+        return "Strong Positive"
+    elif score > 0:
+        return "Mild Positive"
+    elif score == 0:
+        return "Neutral"
+    elif score > -0.5:
+        return "Mild Negative"
+    else:
+        return "Strong Negative"
+
 df["Polarity"] = df[text_column].apply(get_polarity)
+df["Sentiment_Level"] = df["Polarity"].apply(get_sentiment_label)
 
-# --------------------------------------------------
-# KPI CARDS (EMOJI + COLOR MEANING)
-# --------------------------------------------------
+# ==================================================
+# KPI CARDS
+# ==================================================
+st.markdown("## 📊 Key Performance Indicators")
+
 total = len(df)
-positive_pct = round((df["Sentiment"] == "Positive").sum() / total * 100, 1)
-negative_pct = round((df["Sentiment"] == "Negative").sum() / total * 100, 1)
-risk_count = (df["Sentiment"] == "Negative").sum()
+pos_pct = round((df["Polarity"] > 0).sum() / total * 100, 1)
+neg_pct = round((df["Polarity"] < 0).sum() / total * 100, 1)
+risk_count = (df["Polarity"] < -0.3).sum()
 
-k1, k2, k3 = st.columns(3)
+c1, c2, c3 = st.columns(3)
+c1.metric("😊 Satisfaction Score", f"{pos_pct}%", help="Percentage of positive feedback")
+c2.metric("⚠️ Risk Area Count", risk_count, help="Strongly negative responses")
+c3.metric("📉 Negative Trend %", f"{neg_pct}%", help="Percentage of negative feedback")
 
-k1.metric("😊 Satisfaction Score", f"{positive_pct} %")
-k2.metric("⚠️ Risk Area Count", risk_count)
-k3.metric("📉 Negative Trend %", f"{negative_pct} %")
+# ==================================================
+# AUTO RECOMMENDATIONS
+# ==================================================
+st.markdown("## 🤖 Automated Recommendations")
 
-st.markdown("---")
+if neg_pct > 30:
+    st.markdown("<div class='insight-box bad'>⚠️ Immediate improvement needed in this category.</div>", unsafe_allow_html=True)
+elif neg_pct > 15:
+    st.markdown("<div class='insight-box warn'>⚠️ Moderate dissatisfaction detected. Review feedback.</div>", unsafe_allow_html=True)
+else:
+    st.markdown("<div class='insight-box good'>✅ This area is performing well.</div>", unsafe_allow_html=True)
 
-# --------------------------------------------------
-# STAKEHOLDER TABS
-# --------------------------------------------------
-tab1, tab2, tab3 = st.tabs(["🎓 Admin View", "👨‍🏫 Faculty View", "🧑‍🎓 Student View"])
+with st.expander("ℹ️ How to interpret this?"):
+    st.write("Recommendations are generated based on the percentage and severity of negative sentiment.")
 
-# ================= ADMIN VIEW =================
-with tab1:
-    st.subheader(f"📊 Sentiment Distribution — {category}")
+# ==================================================
+# SENTIMENT DISTRIBUTION (PIE)
+# ==================================================
+st.markdown("## 🥧 Sentiment Distribution")
 
-    counts = df["Sentiment"].value_counts()
+sent_counts = df["Sentiment_Level"].value_counts()
 
-    pie_fig = px.pie(
-        values=counts.values,
-        names=counts.index,
-        color_discrete_sequence=["#2EC4B6", "#90DBF4", "#EF476F"],
-        hole=0.35
-    )
+pie_fig = px.pie(
+    values=sent_counts.values,
+    names=sent_counts.index,
+    hole=0.35,
+    color_discrete_sequence=px.colors.qualitative.Set2
+)
 
-    pie_fig.update_traces(
-        pull=[0.06, 0.03, 0.08],
-        rotation=40,
-        textinfo="percent+label",
-        marker=dict(line=dict(color="white", width=3))
-    )
+pie_fig.update_traces(pull=[0.05]*len(sent_counts))
+st.plotly_chart(pie_fig, use_container_width=True)
 
-    pie_fig.update_layout(paper_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(pie_fig, use_container_width=True)
+# ==================================================
+# HEATMAP (ADVANCED)
+# ==================================================
+st.markdown("## 🔥 Sentiment Heatmap (Aspect × Severity)")
 
-# ================= FACULTY VIEW =================
-with tab2:
-    st.subheader("📈 Sentiment Trend")
+heat_df = df["Sentiment_Level"].value_counts().reset_index()
+heat_df.columns = ["Sentiment", "Count"]
 
-    df["Index"] = np.arange(len(df))
-    sentiment_map = {"Positive": 1, "Neutral": 0, "Negative": -1}
-    df["Sentiment_Score"] = df["Sentiment"].map(sentiment_map)
+fig, ax = plt.subplots()
+sns.heatmap(
+    heat_df[["Count"]].T,
+    annot=True,
+    cmap="YlGnBu",
+    fmt="d",
+    ax=ax
+)
 
-    trend_fig = px.line(
-        df,
-        x="Index",
-        y="Sentiment_Score",
-        markers=True,
-        color_discrete_sequence=["#2EC4B6"]
-    )
+st.pyplot(fig)
 
-    trend_fig.update_layout(
-        yaxis=dict(tickvals=[-1, 0, 1], ticktext=["Negative", "Neutral", "Positive"]),
-        paper_bgcolor="rgba(0,0,0,0)"
-    )
+with st.expander("ℹ️ How to interpret this heatmap?"):
+    st.write("Darker colors indicate higher concentration of feedback in that sentiment category.")
 
-    st.plotly_chart(trend_fig, use_container_width=True)
+# ==================================================
+# WORD CLOUD
+# ==================================================
+st.markdown("## ☁️ Common Feedback Themes")
 
-# ================= STUDENT VIEW =================
-with tab3:
-    st.subheader("☁️ Feedback Themes (WordCloud)")
+text_data = " ".join(df[text_column].dropna().astype(str))
 
-    text_data = " ".join(df[text_column].dropna().astype(str))
-    wordcloud = WordCloud(
-        width=900,
-        height=400,
-        background_color="white",
-        colormap="summer",
-        max_words=120
-    ).generate(text_data)
+wordcloud = WordCloud(
+    width=900,
+    height=400,
+    background_color="white",
+    colormap="summer"
+).generate(text_data)
 
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.imshow(wordcloud)
-    ax.axis("off")
-    st.pyplot(fig)
+fig_wc, ax_wc = plt.subplots(figsize=(10, 4))
+ax_wc.imshow(wordcloud)
+ax_wc.axis("off")
+st.pyplot(fig_wc)
 
-# --------------------------------------------------
-# KEYWORD FREQUENCY ANALYSIS (SMART FEATURE)
-# --------------------------------------------------
-st.markdown("---")
-st.subheader("🔑 Keyword Frequency Analysis")
-
-def extract_keywords(text_series):
-    words = []
-    for text in text_series.dropna():
-        clean = re.sub(r"[^a-zA-Z ]", "", text.lower())
-        words.extend(clean.split())
-    return Counter(words)
-
-positive_words = extract_keywords(df[df["Sentiment"] == "Positive"][text_column])
-negative_words = extract_keywords(df[df["Sentiment"] == "Negative"][text_column])
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("### ✅ Top Positive Keywords")
-    for word, count in positive_words.most_common(10):
-        st.write(f"• **{word}** ({count})")
-
-with col2:
-    st.markdown("### ❌ Top Negative Keywords")
-    for word, count in negative_words.most_common(10):
-        st.write(f"• **{word}** ({count})")
-
-# --------------------------------------------------
+# ==================================================
 # TOPIC MODELING (LDA)
-# --------------------------------------------------
-st.markdown("---")
-st.subheader("🧠 Topic Modeling (LDA)")
+# ==================================================
+st.markdown("## 🧠 Topic Modeling (LDA)")
 
 try:
-    vectorizer = CountVectorizer(stop_words="english", max_df=0.9, min_df=5)
+    vectorizer = CountVectorizer(stop_words="english", min_df=5)
     dtm = vectorizer.fit_transform(df[text_column].dropna().astype(str))
 
     lda = LatentDirichletAllocation(n_components=3, random_state=42)
@@ -222,22 +209,8 @@ try:
 except:
     st.warning("Topic modeling could not be generated due to limited data.")
 
-# --------------------------------------------------
-# LIMITATIONS & FUTURE
-# --------------------------------------------------
-st.subheader("⚠️ Limitations")
-st.markdown("""
-- Sentiment is lexicon-based (TextBlob)
-- Keywords may include common words
-- Dataset limited to one institution
-""")
-
-st.subheader("🚀 Future Scope")
-st.markdown("""
-- BERT-based sentiment classification
-- Automated recommendations
-- Real-time feedback ingestion
-- Department-level dashboards
-""")
-
-st.markdown("<p style='text-align:center;font-size:12px;color:#374151;'>Built with Streamlit & NLP</p>", unsafe_allow_html=True)
+# ==================================================
+# FOOTER
+# ==================================================
+st.markdown("---")
+st.markdown("<p style='text-align:center;font-size:12px;'>Advanced NLP Dashboard | Streamlit</p>", unsafe_allow_html=True)
