@@ -1,47 +1,35 @@
 import streamlit as st
 import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
+import plotly.express as px
 from textblob import TextBlob
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
-# -------------------- PAGE CONFIG --------------------
+# ---------------- PAGE CONFIG ----------------
 st.set_page_config(
-    page_title="Student Event Feedback Sentiment Analysis",
+    page_title="Student Feedback Sentiment Analysis",
+    page_icon="🎓",
     layout="wide"
 )
 
-# -------------------- TITLE --------------------
+# ---------------- TITLE ----------------
 st.title("🎓 Student Event Feedback Sentiment Analysis")
 st.markdown(
     "Analyze student feedback to uncover satisfaction trends and improvement areas using NLP."
 )
 
-# -------------------- LOAD DATA --------------------
+# ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
     return pd.read_excel("dataset/finalDataset0.2.xlsx")
 
 df = load_data()
 
-# -------------------- RENAME COLUMNS (IMPORTANT FIX) --------------------
-df = df.rename(columns={
-    "teaching.1": "teaching_text",
-    "coursecontent.1": "coursecontent_text",
-    "Examination": "examination_text",
-    "labwork.1": "labwork_text",
-    "library_facilities": "library_text",
-    "extracurricular.1": "extracurricular_text"
-})
-
-# -------------------- DATA PREVIEW --------------------
-st.subheader("📂 Dataset Preview")
-st.dataframe(df.head())
-
-# -------------------- SENTIMENT FUNCTION --------------------
+# ---------------- SENTIMENT FUNCTION ----------------
 def get_sentiment(text):
     if pd.isna(text):
         return "Neutral"
-    polarity = TextBlob(str(text)).sentiment.polarity
+    polarity = TextBlob(text).sentiment.polarity
     if polarity > 0:
         return "Positive"
     elif polarity < 0:
@@ -49,61 +37,117 @@ def get_sentiment(text):
     else:
         return "Neutral"
 
-# -------------------- SENTIMENT ANALYSIS --------------------
-df["Teaching_Sentiment"] = df["teaching_text"].apply(get_sentiment)
+# ---------------- CATEGORY SELECTOR ----------------
+category_map = {
+    "Teaching": "teaching_text",
+    "Course Content": "coursecontent_text",
+    "Examination": "examination_text",
+    "Library Facilities": "library_facilities",
+    "Extracurricular": "extracurricular_text"
+}
 
-# -------------------- SENTIMENT DISTRIBUTION CHART --------------------
-st.subheader("📊 Teaching Feedback Sentiment Distribution")
-
-sentiment_counts = df["Teaching_Sentiment"].value_counts()
-
-fig, ax = plt.subplots(figsize=(6, 4))
-sns.barplot(
-    x=sentiment_counts.index,
-    y=sentiment_counts.values,
-    palette="coolwarm",
-    ax=ax
+selected_category = st.selectbox(
+    "📌 Select Feedback Category",
+    list(category_map.keys())
 )
 
-ax.set_title("Teaching Feedback Sentiment Distribution", fontsize=14)
-ax.set_xlabel("Sentiment")
-ax.set_ylabel("Number of Responses")
+text_column = category_map[selected_category]
 
-# Show values on bars
-for i, v in enumerate(sentiment_counts.values):
-    ax.text(i, v + 0.5, str(v), ha='center')
+df["Sentiment"] = df[text_column].apply(get_sentiment)
 
-st.pyplot(fig)
+# ---------------- TABS ----------------
+tab1, tab2, tab3 = st.tabs([
+    "📊 Overview",
+    "🧠 Sentiment Analysis",
+    "📌 Insights & Scope"
+])
 
-# -------------------- INSIGHTS --------------------
+# ================= TAB 1 =================
+with tab1:
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.subheader("📂 Dataset Preview")
+        st.dataframe(df[[text_column]].head())
+
+    with col2:
+        st.subheader("📊 Dataset Summary")
+        st.metric("Total Responses", len(df))
+        st.metric("Selected Category", selected_category)
+
+# ================= TAB 2 =================
+with tab2:
+    col1, col2 = st.columns(2)
+
+    # -------- PIE CHART --------
+    sentiment_counts = df["Sentiment"].value_counts().reset_index()
+    sentiment_counts.columns = ["Sentiment", "Count"]
+
+    fig = px.pie(
+        sentiment_counts,
+        names="Sentiment",
+        values="Count",
+        title=f"{selected_category} Feedback Sentiment Distribution",
+        color="Sentiment",
+        color_discrete_map={
+            "Positive": "#4CC9F0",
+            "Negative": "#F72585",
+            "Neutral": "#7209B7"
+        },
+        hole=0.4
+    )
+
+    fig.update_layout(height=380)
+
+    with col1:
+        st.plotly_chart(fig, use_container_width=True)
+
+    # -------- WORD CLOUD --------
+    with col2:
+        st.subheader("☁️ Feedback Word Cloud")
+
+        text_data = " ".join(
+            df[text_column].dropna().astype(str).tolist()
+        )
+
+        wordcloud = WordCloud(
+            width=600,
+            height=350,
+            background_color="white",
+            colormap="viridis"
+        ).generate(text_data)
+
+        fig_wc, ax = plt.subplots(figsize=(6, 4))
+        ax.imshow(wordcloud, interpolation="bilinear")
+        ax.axis("off")
+
+        st.pyplot(fig_wc)
+
+# ================= TAB 3 =================
+with tab3:
+    st.subheader("📌 Key Insights")
+
+    st.markdown(f"""
+    - **{selected_category} feedback** is predominantly **positive**, indicating overall satisfaction.
+    - **Negative responses** highlight specific improvement areas.
+    - **Neutral feedback** suggests consistency but room for engagement.
+    """)
+
+    st.subheader("⚠️ Limitations")
+    st.markdown("""
+    - Sentiment analysis uses **TextBlob (lexicon-based)** and may miss sarcasm or context.
+    - Dataset is limited to a **single institution**.
+    - Neutral sentiment may include weak opinions.
+    """)
+
+    st.subheader("🚀 Future Scope")
+    st.markdown("""
+    - Use **VADER / BERT-based models** for deeper sentiment understanding.
+    - Perform **topic modeling (LDA)** to identify key complaint themes.
+    - Deploy as a **real-time feedback dashboard** integrated with Google Forms.
+    """)
+
+# ---------------- FOOTER ----------------
 st.markdown("---")
-st.subheader("📌 Key Insights")
+st.caption("📊 Built with Streamlit | NLP | Data Science Internship Project")
 
-st.markdown("""
-- Teaching feedback is **mostly positive**, indicating effective instruction quality.
-- Some responses highlight the need for **more practical exposure** in teaching.
-- Neutral feedback suggests consistency but limited emotional engagement.
-""")
-
-# -------------------- LIMITATIONS --------------------
-st.subheader("⚠️ Limitations")
-
-st.markdown("""
-- Sentiment analysis is based on **lexicon-based NLP (TextBlob)** and may miss sarcasm or context.
-- Dataset size is relatively small and limited to a **single institution**.
-- Neutral sentiment may include slightly positive or negative opinions.
-""")
-
-# -------------------- FUTURE SCOPE --------------------
-st.subheader("🚀 Future Scope")
-
-st.markdown("""
-- Integrate **VADER or transformer-based models (BERT)** for more accurate sentiment analysis.
-- Apply **topic modeling (LDA)** to identify recurring feedback themes.
-- Extend the dashboard with **filters by category and sentiment type**.
-- Deploy the application with **Streamlit Cloud** for public access.
-""")
-
-# -------------------- FOOTER --------------------
-st.markdown("---")
-st.caption("📊 Built with Streamlit | NLP using TextBlob | Internship Task 03")
