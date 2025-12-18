@@ -78,7 +78,4 @@ This project demonstrates how NLP-based sentiment analysis can be applied to stu
 
 ---
 
-## 👤 Author
-jayabharathi s
-Future Intern – Data Science & Analytics  
-Task 3 Submission
+
