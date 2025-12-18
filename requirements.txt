@@ -1,9 +1,9 @@
 streamlit
 pandas
 numpy
-matplotlib
-seaborn
-textblob
 plotly
+textblob
 wordcloud
+matplotlib
 openpyxl
+scikit-learn
