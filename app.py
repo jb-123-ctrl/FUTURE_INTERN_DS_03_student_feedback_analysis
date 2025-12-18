@@ -158,21 +158,26 @@ with tab2:
 
 # ================= STUDENT VIEW =================
 with tab3:
-    st.subheader("☁️ Feedback Themes")
+    st.subheader("☁️ Feedback Themes (WordCloud)")
 
     text_data = " ".join(df[text_column].dropna().astype(str))
-    wordcloud = WordCloud(
-        width=800,
-        height=350,
-        background_color="white",
-        colormap="summer",
-        max_words=120
-    ).generate(text_data)
+    text_data = text_data.replace("nan", "").strip()
 
-    fig, ax = plt.subplots(figsize=(9, 4))
-    ax.imshow(wordcloud)
-    ax.axis("off")
-    st.pyplot(fig)
+    if text_data == "":
+        st.warning("Not enough feedback to generate a WordCloud for this category.")
+    else:
+        wordcloud = WordCloud(
+            width=800,
+            height=350,
+            background_color="white",
+            colormap="summer",
+            max_words=120
+        ).generate(text_data)
+
+        fig, ax = plt.subplots(figsize=(9, 4))
+        ax.imshow(wordcloud)
+        ax.axis("off")
+        st.pyplot(fig)
 
 # --------------------------------------------------
 # KEYWORD FREQUENCY ANALYSIS
@@ -255,17 +260,22 @@ st.markdown("---")
 st.subheader("🧠 Topic Modeling (LDA)")
 
 try:
-    vectorizer = CountVectorizer(stop_words="english", max_df=0.9, min_df=5)
-    dtm = vectorizer.fit_transform(df[text_column].dropna().astype(str))
+    text_series = df[text_column].dropna().astype(str)
 
-    lda = LatentDirichletAllocation(n_components=3, random_state=42)
-    lda.fit(dtm)
+    if len(text_series) < 5:
+        st.warning("Not enough data for topic modeling.")
+    else:
+        vectorizer = CountVectorizer(stop_words="english", max_df=0.9, min_df=5)
+        dtm = vectorizer.fit_transform(text_series)
 
-    feature_names = vectorizer.get_feature_names_out()
+        lda = LatentDirichletAllocation(n_components=3, random_state=42)
+        lda.fit(dtm)
 
-    for i, topic in enumerate(lda.components_):
-        words = [feature_names[j] for j in topic.argsort()[:-7:-1]]
-        st.markdown(f"**Topic {i+1}:** {', '.join(words)}")
+        feature_names = vectorizer.get_feature_names_out()
+
+        for i, topic in enumerate(lda.components_):
+            words = [feature_names[j] for j in topic.argsort()[:-7:-1]]
+            st.markdown(f"**Topic {i+1}:** {', '.join(words)}")
 
 except:
     st.warning("Topic modeling could not be generated due to limited data.")
@@ -289,3 +299,4 @@ st.markdown("""
 """)
 
 st.markdown("<p style='text-align:center;font-size:12px;color:#374151;'>Built with Streamlit & Advanced NLP</p>", unsafe_allow_html=True)
+
