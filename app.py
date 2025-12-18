@@ -1,66 +1,58 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 from textblob import TextBlob
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
-import seaborn as sns
+from collections import Counter
+import re
 
-# =============================
+# --------------------------------------------------
 # PAGE CONFIG
-# =============================
+# --------------------------------------------------
 st.set_page_config(
     page_title="Student Feedback Sentiment Analysis",
     layout="wide"
 )
 
-# =============================
-# LIGHT THEME (SEA BLUE + GREEN)
-# =============================
+# --------------------------------------------------
+# LIGHT SEA-BLUE + GREEN THEME
+# --------------------------------------------------
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg, #E8F8F5, #E3F2FD);
+    background: linear-gradient(135deg, #E0F7FA, #E8F5E9);
+    color: #1F2933;
 }
-.section {
-    padding: 12px;
-    border-radius: 8px;
-    margin-bottom: 12px;
+h1, h2, h3 {
+    color: #1F2933;
 }
-.good { background-color: #D1FAE5; }
-.warn { background-color: #FEF3C7; }
-.bad { background-color: #FEE2E2; }
-.small-text { font-size: 13px; color: #374151; }
 </style>
 """, unsafe_allow_html=True)
 
-# =============================
+# --------------------------------------------------
 # TITLE
-# =============================
-st.markdown(
-    "<h2 style='text-align:center;'>🎓 Student Event Feedback Sentiment Analysis</h2>",
-    unsafe_allow_html=True
-)
-st.markdown(
-    "<p style='text-align:center;' class='small-text'>Compact NLP Dashboard for Stakeholders</p>",
-    unsafe_allow_html=True
-)
+# --------------------------------------------------
+st.markdown("<h1 style='text-align:center;'>🎓 Student Event Feedback Sentiment Analysis</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center;color:#374151;'>Advanced NLP-based dashboard to uncover satisfaction trends & improvement areas</p>", unsafe_allow_html=True)
 
-# =============================
+# --------------------------------------------------
 # LOAD DATA
-# =============================
+# --------------------------------------------------
 @st.cache_data
 def load_data():
     return pd.read_excel("dataset/finalDataset0.2.xlsx")
 
 df = load_data()
 
-# =============================
+# --------------------------------------------------
 # SIDEBAR FILTER
-# =============================
-st.sidebar.header("🔍 Filters")
+# --------------------------------------------------
+st.sidebar.header("🔍 Controls")
 
 category_map = {
     "Teaching": "teaching.1",
@@ -71,130 +63,229 @@ category_map = {
     "Extracurricular": "extracurricular.1"
 }
 
-category = st.sidebar.selectbox("Select Feedback Area", list(category_map.keys()))
-text_col = category_map[category]
+category = st.sidebar.selectbox("Select Feedback Category", list(category_map.keys()))
+text_column = category_map[category]
 
-# =============================
+# --------------------------------------------------
 # SENTIMENT FUNCTIONS
-# =============================
-def polarity(text):
+# --------------------------------------------------
+def get_sentiment(text):
+    if pd.isna(text):
+        return "Neutral"
+    polarity = TextBlob(str(text)).sentiment.polarity
+    if polarity > 0:
+        return "Positive"
+    elif polarity < 0:
+        return "Negative"
+    else:
+        return "Neutral"
+
+def get_polarity(text):
     if pd.isna(text):
         return 0
     return TextBlob(str(text)).sentiment.polarity
 
-df["Polarity"] = df[text_col].apply(polarity)
+df["Sentiment"] = df[text_column].apply(get_sentiment)
+df["Polarity"] = df[text_column].apply(get_polarity)
 
-df["Sentiment"] = df["Polarity"].apply(
-    lambda x: "Positive" if x > 0 else "Negative" if x < 0 else "Neutral"
-)
+# --------------------------------------------------
+# KPI CARDS
+# --------------------------------------------------
+total = len(df)
+positive_pct = round((df["Sentiment"] == "Positive").sum() / total * 100, 1)
+negative_pct = round((df["Sentiment"] == "Negative").sum() / total * 100, 1)
+risk_count = (df["Sentiment"] == "Negative").sum()
 
-# =============================
-# KPI METRICS
-# =============================
-pos_pct = round((df["Polarity"] > 0).mean() * 100, 1)
-neg_pct = round((df["Polarity"] < 0).mean() * 100, 1)
-risk = (df["Polarity"] < -0.3).sum()
+k1, k2, k3 = st.columns(3)
+k1.metric("😊 Satisfaction Score", f"{positive_pct}%")
+k2.metric("⚠️ Risk Area Count", risk_count)
+k3.metric("📉 Negative Trend %", f"{negative_pct}%")
 
-c1, c2, c3 = st.columns(3)
-c1.metric("😊 Satisfaction %", f"{pos_pct}%")
-c2.metric("⚠️ Risk Responses", risk)
-c3.metric("📉 Negative %", f"{neg_pct}%")
+st.markdown("---")
 
-# =============================
-# TABS FOR STAKEHOLDERS
-# =============================
-admin_tab, faculty_tab, student_tab = st.tabs(
-    ["🎓 Admin View", "👨‍🏫 Faculty View", "🧑‍🎓 Student View"]
-)
+# --------------------------------------------------
+# STAKEHOLDER TABS
+# --------------------------------------------------
+tab1, tab2, tab3 = st.tabs(["🎓 Admin View", "👨‍🏫 Faculty View", "🧑‍🎓 Student View"])
 
-# =================================================
-# ADMIN VIEW
-# =================================================
-with admin_tab:
-    st.markdown("### 📊 Overall Sentiment Distribution")
+# ================= ADMIN VIEW =================
+with tab1:
+    st.subheader(f"📊 Sentiment Distribution — {category}")
 
-    pie = px.pie(
+    counts = df["Sentiment"].value_counts()
+
+    pie_fig = px.pie(
+        values=counts.values,
+        names=counts.index,
+        color_discrete_sequence=["#2EC4B6", "#90DBF4", "#EF476F"],
+        hole=0.35
+    )
+
+    pie_fig.update_traces(
+        pull=[0.05, 0.02, 0.07],
+        textinfo="percent+label",
+        marker=dict(line=dict(color="white", width=2))
+    )
+
+    pie_fig.update_layout(paper_bgcolor="rgba(0,0,0,0)")
+    st.plotly_chart(pie_fig, use_container_width=True)
+
+# ================= FACULTY VIEW =================
+with tab2:
+    st.subheader("📈 Sentiment Trend")
+
+    df["Index"] = np.arange(len(df))
+    sentiment_map = {"Positive": 1, "Neutral": 0, "Negative": -1}
+    df["Sentiment_Score"] = df["Sentiment"].map(sentiment_map)
+
+    trend_fig = px.line(
         df,
-        names="Sentiment",
-        hole=0.35,
-        color_discrete_sequence=px.colors.qualitative.Set2
+        x="Index",
+        y="Sentiment_Score",
+        markers=True,
+        color_discrete_sequence=["#2EC4B6"]
     )
-    pie.update_traces(pull=[0.05, 0.05, 0.05])
-    st.plotly_chart(pie, use_container_width=True)
 
-    st.markdown("### 🔥 Sentiment Heatmap")
-
-    heat = df["Sentiment"].value_counts().reset_index()
-    heat.columns = ["Sentiment", "Count"]
-
-    fig, ax = plt.subplots(figsize=(4, 2))
-    sns.heatmap(
-        heat[["Count"]].T,
-        annot=True,
-        cmap="YlGnBu",
-        fmt="d",
-        ax=ax
+    trend_fig.update_layout(
+        yaxis=dict(
+            tickvals=[-1, 0, 1],
+            ticktext=["Negative", "Neutral", "Positive"]
+        ),
+        paper_bgcolor="rgba(0,0,0,0)"
     )
-    st.pyplot(fig)
 
-# =================================================
-# FACULTY VIEW
-# =================================================
-with faculty_tab:
-    st.markdown("### ☁️ Key Feedback Themes")
+    st.plotly_chart(trend_fig, use_container_width=True)
 
-    text_data = " ".join(df[text_col].dropna().astype(str))
-    wc = WordCloud(
-        width=600,
-        height=250,
+# ================= STUDENT VIEW =================
+with tab3:
+    st.subheader("☁️ Feedback Themes")
+
+    text_data = " ".join(df[text_column].dropna().astype(str))
+    wordcloud = WordCloud(
+        width=800,
+        height=350,
         background_color="white",
-        colormap="summer"
+        colormap="summer",
+        max_words=120
     ).generate(text_data)
 
-    fig_wc, ax_wc = plt.subplots(figsize=(6, 2.5))
-    ax_wc.imshow(wc)
-    ax_wc.axis("off")
-    st.pyplot(fig_wc)
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.imshow(wordcloud)
+    ax.axis("off")
+    st.pyplot(fig)
 
-    st.markdown("### 🧠 Topic Modeling (LDA)")
-
-    try:
-        vec = CountVectorizer(stop_words="english", min_df=5)
-        dtm = vec.fit_transform(df[text_col].dropna().astype(str))
-
-        lda = LatentDirichletAllocation(n_components=3, random_state=42)
-        lda.fit(dtm)
-
-        words = vec.get_feature_names_out()
-        for i, topic in enumerate(lda.components_):
-            top_words = [words[j] for j in topic.argsort()[:-6:-1]]
-            st.markdown(f"**Topic {i+1}:** {', '.join(top_words)}")
-    except:
-        st.warning("Not enough data for topic modeling.")
-
-# =================================================
-# STUDENT VIEW
-# =================================================
-with student_tab:
-    st.markdown("### 📌 Key Insights")
-
-    if neg_pct > 30:
-        st.markdown("<div class='section bad'>⚠️ Students are largely dissatisfied in this area.</div>", unsafe_allow_html=True)
-    elif neg_pct > 15:
-        st.markdown("<div class='section warn'>⚠️ Mixed feedback — improvements recommended.</div>", unsafe_allow_html=True)
-    else:
-        st.markdown("<div class='section good'>✅ Students are generally satisfied.</div>", unsafe_allow_html=True)
-
-    with st.expander("ℹ️ How to interpret this?"):
-        st.write(
-            "Insights are based on sentiment polarity derived from student feedback using NLP."
-        )
-
-# =============================
-# PROFESSIONAL ENDING
-# =============================
+# --------------------------------------------------
+# KEYWORD FREQUENCY ANALYSIS
+# --------------------------------------------------
 st.markdown("---")
-st.markdown(
-    "<p style='text-align:center;font-size:12px;'>Advanced NLP Dashboard | Built with Streamlit & Python</p>",
-    unsafe_allow_html=True
+st.subheader("🔑 Keyword Frequency Analysis")
+
+def extract_keywords(text_series):
+    words = []
+    for text in text_series.dropna():
+        clean = re.sub(r"[^a-zA-Z ]", "", text.lower())
+        words.extend(clean.split())
+    return Counter(words)
+
+pos_words = extract_keywords(df[df["Sentiment"] == "Positive"][text_column])
+neg_words = extract_keywords(df[df["Sentiment"] == "Negative"][text_column])
+
+c1, c2 = st.columns(2)
+
+with c1:
+    st.markdown("### ✅ Positive Keywords")
+    for w, c in pos_words.most_common(8):
+        st.write(f"• **{w}** ({c})")
+
+with c2:
+    st.markdown("### ❌ Negative Keywords")
+    for w, c in neg_words.most_common(8):
+        st.write(f"• **{w}** ({c})")
+
+# --------------------------------------------------
+# SENTIMENT HEATMAP
+# --------------------------------------------------
+st.markdown("---")
+st.subheader("🔥 Sentiment Heatmap Across Categories")
+
+heatmap_data = {}
+for cat, col in category_map.items():
+    heatmap_data[cat] = df[col].dropna().apply(get_sentiment).value_counts()
+
+heatmap_df = pd.DataFrame(heatmap_data).fillna(0)
+
+fig, ax = plt.subplots(figsize=(8, 3))
+sns.heatmap(
+    heatmap_df,
+    annot=True,
+    fmt=".0f",
+    cmap="YlGnBu",
+    linewidths=0.5,
+    ax=ax
 )
+ax.set_xlabel("Category")
+ax.set_ylabel("Sentiment")
+st.pyplot(fig)
+
+# --------------------------------------------------
+# POLARITY DISTRIBUTION
+# --------------------------------------------------
+st.markdown("---")
+st.subheader("📊 Sentiment Intensity Distribution")
+
+hist_fig = px.histogram(
+    df,
+    x="Polarity",
+    nbins=30,
+    color_discrete_sequence=["#2EC4B6"]
+)
+
+hist_fig.update_layout(
+    xaxis_title="Polarity (-1 = Negative, +1 = Positive)",
+    yaxis_title="Responses",
+    paper_bgcolor="rgba(0,0,0,0)"
+)
+
+st.plotly_chart(hist_fig, use_container_width=True)
+
+# --------------------------------------------------
+# TOPIC MODELING (LDA)
+# --------------------------------------------------
+st.markdown("---")
+st.subheader("🧠 Topic Modeling (LDA)")
+
+try:
+    vectorizer = CountVectorizer(stop_words="english", max_df=0.9, min_df=5)
+    dtm = vectorizer.fit_transform(df[text_column].dropna().astype(str))
+
+    lda = LatentDirichletAllocation(n_components=3, random_state=42)
+    lda.fit(dtm)
+
+    feature_names = vectorizer.get_feature_names_out()
+
+    for i, topic in enumerate(lda.components_):
+        words = [feature_names[j] for j in topic.argsort()[:-7:-1]]
+        st.markdown(f"**Topic {i+1}:** {', '.join(words)}")
+
+except:
+    st.warning("Topic modeling could not be generated due to limited data.")
+
+# --------------------------------------------------
+# LIMITATIONS & FUTURE
+# --------------------------------------------------
+st.subheader("⚠️ Limitations")
+st.markdown("""
+- Lexicon-based sentiment may miss sarcasm/context  
+- Limited to one institution dataset  
+- Topic modeling depends on text volume  
+""")
+
+st.subheader("🚀 Future Scope")
+st.markdown("""
+- BERT-based sentiment models  
+- Automated improvement recommendations  
+- Department-level dashboards  
+- Real-time feedback ingestion  
+""")
+
+st.markdown("<p style='text-align:center;font-size:12px;color:#374151;'>Built with Streamlit & Advanced NLP</p>", unsafe_allow_html=True)
