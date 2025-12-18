@@ -38,7 +38,10 @@ h1, h2, h3 {
 # TITLE
 # --------------------------------------------------
 st.markdown("<h1 style='text-align:center;'>🎓 Student Event Feedback Sentiment Analysis</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;color:#374151;'>Advanced NLP-based dashboard to uncover satisfaction trends & improvement areas</p>", unsafe_allow_html=True)
+st.markdown(
+    "<p style='text-align:center;color:#374151;'>Advanced NLP dashboard to uncover satisfaction trends & improvement areas</p>",
+    unsafe_allow_html=True
+)
 
 # --------------------------------------------------
 # LOAD DATA
@@ -117,8 +120,8 @@ with tab1:
     pie_fig = px.pie(
         values=counts.values,
         names=counts.index,
-        color_discrete_sequence=["#2EC4B6", "#90DBF4", "#EF476F"],
-        hole=0.35
+        hole=0.35,
+        color_discrete_sequence=["#2EC4B6", "#90DBF4", "#EF476F"]
     )
 
     pie_fig.update_traces(
@@ -160,19 +163,27 @@ with tab2:
 with tab3:
     st.subheader("☁️ Feedback Themes (WordCloud)")
 
-    text_data = " ".join(df[text_column].dropna().astype(str))
-    text_data = text_data.replace("nan", "").strip()
+    raw_text = df[text_column].dropna().astype(str)
 
-    if text_data == "":
-        st.warning("Not enough feedback to generate a WordCloud for this category.")
+    cleaned_text = []
+    for text in raw_text:
+        text = re.sub(r"[^a-zA-Z ]", "", text.lower()).strip()
+        if len(text.split()) > 2:
+            cleaned_text.append(text)
+
+    final_text = " ".join(cleaned_text)
+
+    if not final_text or len(final_text.split()) < 5:
+        st.info("Not enough meaningful feedback to generate WordCloud for this category.")
     else:
         wordcloud = WordCloud(
             width=800,
             height=350,
             background_color="white",
             colormap="summer",
-            max_words=120
-        ).generate(text_data)
+            max_words=120,
+            stopwords=set(WordCloud().stopwords)
+        ).generate(final_text)
 
         fig, ax = plt.subplots(figsize=(9, 4))
         ax.imshow(wordcloud)
@@ -260,22 +271,17 @@ st.markdown("---")
 st.subheader("🧠 Topic Modeling (LDA)")
 
 try:
-    text_series = df[text_column].dropna().astype(str)
+    vectorizer = CountVectorizer(stop_words="english", max_df=0.9, min_df=5)
+    dtm = vectorizer.fit_transform(df[text_column].dropna().astype(str))
 
-    if len(text_series) < 5:
-        st.warning("Not enough data for topic modeling.")
-    else:
-        vectorizer = CountVectorizer(stop_words="english", max_df=0.9, min_df=5)
-        dtm = vectorizer.fit_transform(text_series)
+    lda = LatentDirichletAllocation(n_components=3, random_state=42)
+    lda.fit(dtm)
 
-        lda = LatentDirichletAllocation(n_components=3, random_state=42)
-        lda.fit(dtm)
+    feature_names = vectorizer.get_feature_names_out()
 
-        feature_names = vectorizer.get_feature_names_out()
-
-        for i, topic in enumerate(lda.components_):
-            words = [feature_names[j] for j in topic.argsort()[:-7:-1]]
-            st.markdown(f"**Topic {i+1}:** {', '.join(words)}")
+    for i, topic in enumerate(lda.components_):
+        words = [feature_names[j] for j in topic.argsort()[:-7:-1]]
+        st.markdown(f"**Topic {i+1}:** {', '.join(words)}")
 
 except:
     st.warning("Topic modeling could not be generated due to limited data.")
@@ -285,18 +291,20 @@ except:
 # --------------------------------------------------
 st.subheader("⚠️ Limitations")
 st.markdown("""
-- Lexicon-based sentiment may miss sarcasm/context  
-- Limited to one institution dataset  
+- Lexicon-based sentiment may miss sarcasm or context  
+- Dataset limited to one institution  
 - Topic modeling depends on text volume  
 """)
 
 st.subheader("🚀 Future Scope")
 st.markdown("""
-- BERT-based sentiment models  
-- Automated improvement recommendations  
+- BERT-based sentiment analysis  
+- Automated recommendation engine  
 - Department-level dashboards  
 - Real-time feedback ingestion  
 """)
 
-st.markdown("<p style='text-align:center;font-size:12px;color:#374151;'>Built with Streamlit & Advanced NLP</p>", unsafe_allow_html=True)
-
+st.markdown(
+    "<p style='text-align:center;font-size:12px;color:#374151;'>Built with Streamlit & Advanced NLP</p>",
+    unsafe_allow_html=True
+)
