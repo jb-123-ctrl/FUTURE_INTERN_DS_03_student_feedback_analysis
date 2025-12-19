@@ -5,5 +5,6 @@ plotly
 textblob
 wordcloud
 matplotlib
-openpyxl
+seaborn
 scikit-learn
+openpyxl
